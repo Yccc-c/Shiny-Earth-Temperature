@@ -1,12 +1,12 @@
 ---
 title: "EarthTemp"
-date: '2022-10-09'
+date: '2022-10-10'
 output: 
   flexdashboard::flex_dashboard:
     orientation: rows
     vertical_layout: scroll
     social: menu
-    source: embed
+    source: "https://github.com/Yccc-c/Shiny-Earth-Temperature"
 runtime: shiny
 css: dashboard.css
 ---
@@ -19,6 +19,7 @@ library(lubridate)
 library(tidyverse)
 library(ggplot2)
 library(cowplot)
+library(emojifont)
 options(width=100)
 
 world_map <- map_data("world")
@@ -69,13 +70,13 @@ dateInput("time",
           weekstart = 1,)
 ```
 
-This page is built by [**flexdashboard**](https://pkgs.rstudio.com/flexdashboard/). It also use three icons on [**Font awesome**](https://fontawesome.com/)
+This page is built by [**flexdashboard**](https://pkgs.rstudio.com/flexdashboard/). It also use three icons from [**Font awesome**](https://fontawesome.com/).
 
-After selecting, it will take some time to load the plots and tables, please wait patiently and don't do any other operation such as zooming the window, otherwise the server may return errors. If it occurs, please contact the author as soon as possible: **cheny_ycc@qq.com**
+`r emoji("warning")` Because of the <span style="color:orange">POTATO</span> server, after selecting, it will take some time to load the plots and tables, **please wait patiently and don't do any other operation** such as zooming the window, otherwise the server may return errors. If it occurs, please contact the author as soon as possible: **cheny_ycc@qq.com**
 
 The shiny is divided into 3 sub-pages. Click the 3 buttons at top to see more information.
 
-The source code is at the top-right corner. If you like it, please give me a "shiny" star. :)
+The source code is at the top-right corner. Beacuse of some unknown reasons, you need to right click it and use the "new tab" to open the github page. If you like it, please give me a "shiny" `r emoji("star")`. Many thanks~
 
 Row
 -----------------------------------------------------------------------
@@ -146,9 +147,9 @@ renderPlot({
 
 Row
 -----------------------------------------------------------------------
-### Tendency
+### Trendency
 
-```{r tendency_render}
+```{r trendency_render}
 renderPlot({
   
   a <- ggplot(global[str_detect(global$dt, "^.....01"),], aes(x = dt)) + 
@@ -304,9 +305,9 @@ renderPlot({
 
 Row
 -----------------------------------------------------------------------
-### Tendency
+### Trendency
 
-```{r tendency_country}
+```{r trendency_country}
 renderPlot({
   Temp <- filter(country, 
                  Country==cou_full_name[as.numeric(input$region_country)])
@@ -397,7 +398,7 @@ renderUI({
 })
 ```
 
-**Average Temperature:** It use data in `*Country.csv`. So in some countries, the **Average Temperature** may be lower or hotter than any city in the country because of unbalanced distribution, such as Canada.
+**Average Temperature:** It uses data in file `*Country.csv`. So in some countries, the **Average Temperature** may be lower or hotter than any city in the country because of unbalanced city distribution, such as Canada.
 
 Row
 -----------------------------------------------------------------------
@@ -450,17 +451,11 @@ Row {data-height=550}
 ### Map
 
 ```{r map_city}
-renderPlot({
-
-  city_current <- filter(city, City==input$select_city)[1,]
-  
-  world_map %>% 
+  p <- reactive({world_map %>% 
     left_join(filter(country, dt==month_standard_city()),
               by = c("region" = "Country")) %>%
     ggplot(aes(x = long, y = lat, group = group)) +
       geom_polygon(aes(fill=AverageTemperature), colour = "white", size = 0.3) +
-      geom_point(aes(x = as.double(city_current[1,7]), 
-                     y = as.double(city_current[1,6])), color = "red", size = 4) +
       scale_x_continuous(breaks = seq(-180, 210, 45), 
                          labels = function(x){paste0(x, "°")}) +
       scale_y_continuous(breaks = seq(-60, 100, 30), 
@@ -470,14 +465,22 @@ renderPlot({
            subtitle = input$time_city, 
            y="Latitude", x="Longitude") +
       coord_quickmap()
+      })
+
+renderPlot({
+
+  city_current <- filter(city, City==input$select_city)[1,]
+  
+  p() + geom_point(aes(x = as.double(city_current[1,7]), 
+                     y = as.double(city_current[1,6])), color = "red", size = 4)
 })
 ```
 
 Row
 -----------------------------------------------------------------------
-### Tendency
+### Trendency
 
-```{r tendency_city}
+```{r trendency_city}
 renderPlot({
   Temp <- filter(city, City==input$select_city)
   
