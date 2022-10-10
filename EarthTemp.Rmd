@@ -14,8 +14,8 @@ output:
 knitr::opts_chunk$set(warning = FALSE, echo = FALSE, message =FALSE)
 library(tidyverse)
 library(ggplot2)
-country <- read_csv("data/Country.csv")
-global <- read_csv("data/Global.csv")
+country <- read_csv("../EarthTemp-shiny/data/Country.csv")
+global <- read_csv("../EarthTemp-shiny/data/Global.csv")
 ```
 
 ## 一、摘要
