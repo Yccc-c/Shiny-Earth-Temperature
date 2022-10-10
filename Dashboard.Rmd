@@ -1,0 +1,534 @@
+---
+title: "EarthTemp"
+date: '2022-10-09'
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: scroll
+    social: menu
+    source: embed
+runtime: shiny
+css: dashboard.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, echo = FALSE, message =FALSE)
+library(flexdashboard)
+library(shiny)
+library(lubridate)
+library(tidyverse)
+library(ggplot2)
+library(cowplot)
+options(width=100)
+
+world_map <- map_data("world")
+world_map[world_map$region=="USA",]$region <- "United States"
+
+country <- read_csv("data/Country.csv")
+global <- read_csv("data/Global.csv")
+state <- read_csv("data/State.csv")
+city <- read_csv("data/City.csv")
+AUS <- read_csv("data/AUS_boundary.csv")
+BRA <- read_csv("data/BRA_boundary.csv")
+CAN <- read_csv("data/CAN_boundary.csv")
+CHN <- read_csv("data/CHN_boundary.csv")
+IND <- read_csv("data/IND_boundary.csv")
+RUS <- read_csv("data/RUS_boundary.csv")
+USA <- read_csv("data/USA_boundary.csv")
+
+cou_abbr_name <- c("global", "AUS", "BRA", "CAN", "CHN", "IND", "RUS", "USA")
+cou_full_name <- c("global", "Australia", "Brazil", "Canada", "China",
+                   "India", "Russia" ,"United States")
+```
+
+```{r month_standard, include=FALSE}
+month_standard <- reactive({str_sub(input$time, 1, 7) %>% 
+    paste("-01", sep = "")})
+month_standard_country <- reactive({str_sub(input$time_country, 1, 7) %>% 
+    paste("-01", sep = "")})
+month_standard_city <- reactive({str_sub(input$time_city, 1, 7) %>% 
+    paste("-01", sep = "")})
+```
+
+Global
+=======================================================================
+
+Sidebar {.sidebar}
+-----------------------------------------------------------------------
+
+Please choose time below:
+
+```{r input}
+dateInput("time", 
+          strong("Month:"),
+          value = "2000-01-01",
+          format = "yyyy-mm",
+          min = "1743-11-01",
+          max = "2013-09-01",
+          startview = "year",
+          weekstart = 1,)
+```
+
+This page is built by [**flexdashboard**](https://pkgs.rstudio.com/flexdashboard/). It also use three icons on [**Font awesome**](https://fontawesome.com/)
+
+After selecting, it will take some time to load the plots and tables, please wait patiently and don't do any other operation such as zooming the window, otherwise the server may return errors. If it occurs, please contact the author as soon as possible: **cheny_ycc@qq.com**
+
+The shiny is divided into 3 sub-pages. Click the 3 buttons at top to see more information.
+
+The source code is at the top-right corner. If you like it, please give me a "shiny" star. :)
+
+Row
+-----------------------------------------------------------------------
+### Average Temperature
+
+```{r valuebox_global_ave}
+global_na <- reactive({na.omit(filter(country, dt==month_standard()))})
+
+renderValueBox({
+  valueBox(value = round(mean(global_na()$AverageTemperature),3),
+           icon = "fas fa-thermometer-half",
+           caption = "Global Average Temperature",
+           color = "lightgreen")
+})
+```
+
+### Highest Temperature
+
+```{r valuebox_global_high}
+renderValueBox({
+
+  m <- max(global_na()$AverageTemperature)
+  valueBox(value = m,
+           caption = paste("Highest country:",
+                        global_na()[global_na()$AverageTemperature==m,][1,4]),
+           icon = "fas fa-thermometer-full",
+           color = "orange")
+})
+```
+
+### Lowest Temperature
+
+```{r valuebox_global_low}
+renderValueBox({
+
+  m <- min(global_na()$AverageTemperature)
+  valueBox(value = m,
+           caption = paste("Lowest country:",
+                        global_na()[global_na()$AverageTemperature==m,][1,4]),
+           icon = "fas fa-thermometer-empty",
+           color = "steelblue")
+})
+```
+
+Row {data-height=550}
+-----------------------------------------------------------------------
+### Map
+
+```{r map_render}
+renderPlot({
+  
+  world_map %>% 
+    left_join(filter(country, dt==month_standard()), 
+              by = c("region" = "Country")) %>%
+    ggplot(aes(x = long, y = lat, group = group)) +
+      geom_polygon(aes(fill=AverageTemperature), colour = "white", size = 0.3) +
+      scale_x_continuous(breaks = seq(-180, 210, 45), 
+                        labels = function(x){paste0(x, "°")}) +
+      scale_y_continuous(breaks = seq(-60, 100, 30), 
+                        labels = function(x){paste0(x, "°")}) +
+      scale_fill_gradient2(low = "steel blue", mid = "white", high="orange") +
+      labs(title="Average Temperature of every country", 
+           subtitle = month_standard(), 
+          y="Latitude", x="Longitude") +
+      coord_quickmap() 
+})
+```
+
+Row
+-----------------------------------------------------------------------
+### Tendency
+
+```{r tendency_render}
+renderPlot({
+  
+  a <- ggplot(global[str_detect(global$dt, "^.....01"),], aes(x = dt)) + 
+    geom_ribbon(aes(ymin = LandAverageTemperature-LandAverageTemperatureUncertainty,
+                    ymax = LandAverageTemperature+LandAverageTemperatureUncertainty),
+                    color="white", fill="grey") +
+    geom_line(aes(y =  LandAverageTemperature)) +
+    geom_smooth(aes(y =  LandAverageTemperature), size = 0.8, color = "orange") +
+    
+    geom_ribbon(data = global[str_detect(global$dt, "^.....07"),],
+                aes(ymin = LandAverageTemperature-LandAverageTemperatureUncertainty,
+                    ymax = LandAverageTemperature+LandAverageTemperatureUncertainty),
+                    color="white", fill="grey") +
+    geom_line(data = global[str_detect(global$dt, "^.....07"),],
+              aes(y =  LandAverageTemperature)) +
+    geom_smooth(data = global[str_detect(global$dt, "^.....07"),],
+              aes(y =  LandAverageTemperature), size = 0.8, color = "steel blue") +
+    xlab("Year") +
+    ylab("Temperature") +
+    geom_vline(xintercept = input$time, color = "red") +
+    labs(title = "Global Land Average Temperature in every July(top) and January(bottom)")
+  
+  b <- global %>%
+    group_by(month(dt)) %>%
+    summarise(ave = mean(LandAverageTemperature, na.rm=TRUE)) %>%
+    ggplot(aes(x = `month(dt)`,y = ave)) +
+    geom_line(color = "green", size = 1) +
+    geom_point(color = "yellowgreen") +
+    geom_vline(xintercept = month(month_standard()), color = "red") +
+    geom_hline(yintercept = unlist(global[global$dt==month_standard(),][1,2]), 
+               color = "red") +
+    scale_x_continuous(breaks = 1:12) +
+    labs(title = "Global Land Average Temperature in every month") +
+    xlab("Month") +
+    ylab("Temperature")
+  
+  plot_grid(a,b,nrow=1)
+})
+```
+
+Row 
+-----------------------------------------------------------------------
+### DataTable
+
+```{r data_table}
+DT::renderDataTable({
+  DT::datatable(filter(country, dt==month_standard()))
+})
+```
+
+Country
+=======================================================================
+
+Sidebar {.sidebar}
+-----------------------------------------------------------------------
+
+Please choose a country and time below:
+
+```{r input_country}
+selectInput("region_country", 
+            strong("Country:"),
+            choices = c("Australia" = 2,
+                        "Brazil" = 3,
+                        "Canada" = 4,
+                        "China" = 5,
+                        "India" = 6,
+                        "Russia" = 7,
+                        "United States" = 8),
+            selected = "China")
+dateInput("time_country", 
+          strong("Month:"),
+          value = "2000-01-01",
+          format = "yyyy-mm",
+          min = "1743-11-01",
+          max = "2013-09-01",
+          startview = "year",
+          weekstart = 1,)
+```
+
+Row
+-----------------------------------------------------------------------
+### Average Temperature
+
+```{r valuebox_state_ave}
+state_na <- reactive({na.omit(filter(state, 
+                         Country==cou_full_name[as.numeric(input$region_country)],
+                         dt==month_standard_country()))})
+
+renderValueBox({
+
+  valueBox(value = round(country[country$Country==cou_full_name[as.numeric(input$region_country)]&country$dt==month_standard_country(),][1,2],3),
+           caption = paste("Average Temperature in", 
+                           cou_full_name[as.numeric(input$region_country)]),
+           icon = "fas fa-thermometer-half",
+           color = "lightgreen")
+})
+```
+
+### Highest Temperature
+
+```{r valuebox_state_high}
+renderValueBox({
+  m <- max(state_na()$AverageTemperature)
+  valueBox(value = m,
+           caption = paste("Highest state in", 
+                           cou_full_name[as.numeric(input$region_country)], ":",
+                          state_na()[state_na()$AverageTemperature==m,][1,4]),
+           icon = "fas fa-thermometer-full",
+           color = "orange")
+})
+```
+
+### Lowest Temperature
+
+```{r valuebox_state_low}
+renderValueBox({
+  m <- min(state_na()$AverageTemperature)
+  valueBox(value = m,
+           caption = paste("Lowest state in", 
+                           cou_full_name[as.numeric(input$region_country)], ":",
+                          state_na()[state_na()$AverageTemperature==m,][1,4]),
+           icon = "fas fa-thermometer-empty",
+           color = "steelblue")
+})
+```
+
+Row {data-height=550}
+-----------------------------------------------------------------------
+### Map
+
+```{r map_country}
+renderPlot({
+  
+  get(cou_abbr_name[as.numeric(input$region_country)]) %>%
+    left_join(filter(state, 
+                Country==cou_full_name[as.numeric(input$region_country)],
+                dt==month_standard_country()), 
+              by = c("State"="State")) %>%
+      ggplot(aes(x = long, y = lat, group = Group)) +
+        geom_polygon(aes(fill=AverageTemperature), colour = "white", size = 0.3) +
+        scale_x_continuous(breaks = seq(-180, 210, 30),
+                           labels = function(x){paste0(x, "°")}) +
+        scale_y_continuous(labels = function(x){paste0(x, "°")}) +
+        scale_fill_gradient2(low = "steel blue", mid = "white", high="orange") +
+        labs(title=paste("AverageTemperature in", 
+                         cou_full_name[as.numeric(input$region_country)]), 
+             y="Latitude", x="Longitude",
+             subtitle = month_standard_country()) +
+        coord_quickmap() +
+        theme_light() 
+})
+```
+
+Row
+-----------------------------------------------------------------------
+### Tendency
+
+```{r tendency_country}
+renderPlot({
+  Temp <- filter(country, 
+                 Country==cou_full_name[as.numeric(input$region_country)])
+  
+  a <- ggplot(Temp[str_detect(Temp$dt, "^.....01"),], aes(x = dt)) + 
+    geom_ribbon(aes(ymin = AverageTemperature-AverageTemperatureUncertainty,
+                    ymax = AverageTemperature+AverageTemperatureUncertainty),
+                color="white", fill="grey") +
+    geom_line(aes(y =  AverageTemperature)) +
+    geom_smooth(aes(y =  AverageTemperature), size = 0.8, color = "steelblue") +
+  
+    geom_ribbon(data = Temp[str_detect(Temp$dt, "^.....07"),],
+                aes(ymin = AverageTemperature-AverageTemperatureUncertainty,
+                    ymax = AverageTemperature+AverageTemperatureUncertainty),
+                color="white", fill="grey") +
+    geom_line(data = Temp[str_detect(Temp$dt, "^.....07"),],
+              aes(y =  AverageTemperature)) +
+    geom_smooth(data = Temp[str_detect(Temp$dt, "^.....07"),],
+                aes(y =  AverageTemperature), size = 0.8, color = "orange") +
+    xlab("Year") +
+    ylab("Temperature") +
+    geom_vline(xintercept = input$time_country, color = "red") +
+    labs(title =paste("Average Temperature of", 
+                      cou_full_name[as.numeric(input$region_country)],
+                      "in every July and January"))
+  b <- Temp %>%
+    group_by(month(dt)) %>%
+    summarise(ave = mean(AverageTemperature, na.rm=TRUE)) %>%
+    ggplot(aes(x = `month(dt)`,y = ave)) +
+    geom_line(color = "green", size = 1) +
+    geom_point(color = "yellowgreen") +
+    geom_vline(xintercept = month(month_standard_country()), color = "red") +
+    geom_hline(yintercept = unlist(Temp[Temp$dt==month_standard_country(),][1,2]), 
+               color = "red") +
+    scale_x_continuous(breaks = 1:12) +
+    labs(title = paste("Average Temperature of", 
+                      cou_full_name[as.numeric(input$region_country)],
+                      "in every month")) +
+    xlab("Month") +
+    ylab("Temperature")
+  
+  plot_grid(a,b,nrow=1)
+})
+```
+
+Row
+-----------------------------------------------------------------------
+### DataTable
+
+```{r datatable_country}
+DT::renderDataTable({
+  DT::datatable(
+    filter(state, 
+           Country==cou_full_name[as.numeric(input$region_country)],
+           dt==month_standard_country()) %>%
+      select(dt, Country, State, AverageTemperature, 
+             AverageTemperatureUncertainty)
+    )
+})
+```
+
+City
+=======================================================================
+
+Sidebar {.sidebar}
+-----------------------------------------------------------------------
+
+Please choose country, city and time below:
+
+```{r input_city}
+dateInput("time_city", 
+          strong("Time:"),
+          value = "2000-01-01",
+          format = "yyyy-mm",
+          min = "1743-11-01",
+          max = "2013-09-01",
+          startview = "year",
+          weekstart = 1,)
+
+selectInput("select_country", strong("Country:"),
+            choices = sort(unique(city$Country)),
+            selected = "China")
+
+renderUI({
+  selectInput("select_city", strong("City:"),
+              choices = unique(city[city$Country==input$select_country,]$City),
+              selected = "Peking")
+})
+```
+
+**Average Temperature:** It use data in `*Country.csv`. So in some countries, the **Average Temperature** may be lower or hotter than any city in the country because of unbalanced distribution, such as Canada.
+
+Row
+-----------------------------------------------------------------------
+### Average Temperature
+
+```{r valuebox_city_ave}
+city_na <- reactive({na.omit(filter(city, dt==month_standard_city(),
+                                    Country==input$select_country))})
+
+renderValueBox({
+  valueBox(value = round(country[country$Country==input$select_country&
+                                  country$dt==month_standard_city(),][1,2],3),
+           caption = paste("Average Temperature in", input$select_country),
+           icon = "fas fa-thermometer-half",
+           color = "lightgreen")
+})
+```
+
+### Highest Temperature
+
+```{r valuebox_city_high}
+renderValueBox({
+  m <- max(city_na()$AverageTemperature)
+  valueBox(value = m,
+           caption = paste("Highest city in",
+                           input$select_country, ":",
+                           city_na()[city_na()$AverageTemperature==m,][1,4]),
+           icon = "fas fa-thermometer-full",
+           color = "orange")
+})
+```
+
+### Lowest Temperature
+
+```{r valuebox_city_low}
+renderValueBox({
+  m <- min(city_na()$AverageTemperature)
+  valueBox(value = m,
+           caption = paste("Lowest city in",
+                           input$select_country, ":",
+                           city_na()[city_na()$AverageTemperature==m,][1,4]),
+           icon = "fas fa-thermometer-empty",
+           color = "steelblue")
+})
+```
+
+
+Row {data-height=550}
+-----------------------------------------------------------------------
+### Map
+
+```{r map_city}
+renderPlot({
+
+  city_current <- filter(city, City==input$select_city)[1,]
+  
+  world_map %>% 
+    left_join(filter(country, dt==month_standard_city()),
+              by = c("region" = "Country")) %>%
+    ggplot(aes(x = long, y = lat, group = group)) +
+      geom_polygon(aes(fill=AverageTemperature), colour = "white", size = 0.3) +
+      geom_point(aes(x = as.double(city_current[1,7]), 
+                     y = as.double(city_current[1,6])), color = "red", size = 4) +
+      scale_x_continuous(breaks = seq(-180, 210, 45), 
+                         labels = function(x){paste0(x, "°")}) +
+      scale_y_continuous(breaks = seq(-60, 100, 30), 
+                         labels = function(x){paste0(x, "°")}) +
+      scale_fill_gradient2(low = "steel blue", mid = "white", high="orange") +
+      labs(title = paste("Average Temperature of", input$select_city), 
+           subtitle = input$time_city, 
+           y="Latitude", x="Longitude") +
+      coord_quickmap()
+})
+```
+
+Row
+-----------------------------------------------------------------------
+### Tendency
+
+```{r tendency_city}
+renderPlot({
+  Temp <- filter(city, City==input$select_city)
+  
+  a <- ggplot(Temp[str_detect(Temp$dt, "^.....01"),], aes(x = dt)) + 
+    geom_ribbon(aes(ymin = AverageTemperature-AverageTemperatureUncertainty,
+                    ymax = AverageTemperature+AverageTemperatureUncertainty),
+                color="white", fill="grey") +
+    geom_line(aes(y =  AverageTemperature)) +
+    geom_smooth(aes(y =  AverageTemperature), size = 0.8, color = "steelblue") +
+    
+    geom_ribbon(data = Temp[str_detect(Temp$dt, "^.....07"),],
+                aes(ymin = AverageTemperature-AverageTemperatureUncertainty,
+                    ymax = AverageTemperature+AverageTemperatureUncertainty),
+                color="white", fill="grey") +
+    geom_line(data = Temp[str_detect(Temp$dt, "^.....07"),],
+              aes(y =  AverageTemperature)) +
+    geom_smooth(data = Temp[str_detect(Temp$dt, "^.....07"),],
+                aes(y =  AverageTemperature), size = 0.8, color = "orange") +
+    xlab("Year") +
+    ylab("Temperature") +
+    geom_vline(xintercept = input$time_city, color = "red") +
+    labs(title = paste("Average Temperature of", 
+                       input$select_city,
+                       "in every July and January"))
+  b <- Temp %>%
+    group_by(month(dt)) %>%
+    summarise(ave = mean(AverageTemperature, na.rm=TRUE)) %>%
+    ggplot(aes(x = `month(dt)`,y = ave)) +
+    geom_line(color = "green", size = 1) +
+    geom_point(color = "yellowgreen") +
+    geom_vline(xintercept = month(month_standard_city()), color = "red") +
+    geom_hline(yintercept = unlist(Temp[Temp$dt==month_standard_city(),][1,2]), 
+               color = "red") +
+    scale_x_continuous(breaks = 1:12) +
+    labs(title = paste("Average Temperature of", 
+                       input$select_city,
+                       "in every month")) +
+    xlab("Month") +
+    ylab("Temperature")
+  
+  plot_grid(a,b,nrow=1)
+})
+```
+
+Row
+-----------------------------------------------------------------------
+### DataTable
+
+```{r datatable_city}
+DT::renderDataTable({
+  DT::datatable(filter(city, dt==month_standard_city(),
+                       Country==input$select_country))
+})
+```

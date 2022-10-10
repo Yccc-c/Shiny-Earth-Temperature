@@ -1,0 +1,202 @@
+---
+title: "Earth Surface Temperature"
+author: 杨晨 钟善美 王涣智
+date: '2022-10-09'
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: true
+    theme: cerulean
+    css: style.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, echo = FALSE, message =FALSE)
+library(tidyverse)
+library(ggplot2)
+country <- read_csv("data/Country.csv")
+global <- read_csv("data/Global.csv")
+```
+
+## 一、摘要
+
+本文主要研究地表温度数据的地图可视化操作，并通过对不同数据的简单分析，得出有关地表温度变化趋势及其分布特征的结论。
+
+- 浏览Shiny程序[**点击这里**](http://shiny.csu.wiki/EarthTemp/EarthTemp-shiny)
+
+本文全部内容使用<span style="color:lightblue">R语言</span>及Rstudio编写，数据集来自于[Kaggle](https://www.kaggle.com/datasets/berkeleyearth/climate-change-earth-surface-temperature-data)。
+
+本文所使用的地图数据集来源如下：
+
+1. 世界地图：源自`ggplot2::map_data("world")`
+2. 澳大利亚、巴西、加拿大、印度、俄罗斯、美国一级行政区边界数据：[**GADM**](https://gadm.org/index.html)。其版权说明如下：
+
+> The data are freely available for academic use and other non-commercial use. Redistribution or commercial use is not allowed without prior permission.
+
+3. 中国地图数据：[**Horizon**](http://horizon2021.xyz/)
+
+> 本文依赖的[Shiny程序](http://shiny.csu.wiki/EarthTemp/EarthTemp-shiny)使用[**flexdashboard**](https://pkgs.rstudio.com/flexdashboard/)包制作。因数据量大以及服务器运算量限制，每次访问该Shiny程序时需要加载约一分钟时间，请耐心等待。同时因流式页面的特性，每次缩放浏览器窗口都会令Shiny重新运行并绘制图像，故请您务必不要多次改变窗口大小，以免网站崩溃。如遇网站崩溃，还请及时联系站长：*cheny_ycc@qq.com*。
+
+## 二、数据概览
+
+本数据集由5个`CSV`文件组成，各文件内数据含义及其格式如下：
+
+- `GlobalTemperatures.csv`
+全球历史地表温度数据，包括陆地均值、极值和陆海均值。
+
+|字段名|数据类型|简介|
+|:-----|:------:|:---|
+|dt|`date`|按月间隔，自`1750-01-01`至`2015-12-01`|
+|LandAverageTemperature|`double`|陆地每月平均温度|
+|LandAverageTemperatureUncertainty|`double`|陆地每月平均温度区间|
+|LandMaxTemperature|`double`|陆地每月最高温度|
+|LandMaxTemperatureUncertainty|`double`|陆地每月最高温度区间|
+|LandMinTemperature|`double`|陆地每月最低温度|
+|LandMinTemperatureUncertainty|`double`|陆地每月最低温度区间|
+|LandAndOceanAverageTemperature|`double`|陆海每月平均温度|
+|LandAndOceanAverageTemperatureUncertainty|`double`|陆海每月平均温度区间|
+
+- `GlobalLandTemperaturesByCountry.csv`
+
+全球各国平均每月温度数据。
+
+|字段名|数据类型|简介|
+|:-----|:------:|:---|
+|dt|`date`|按月间隔，自`1743-11-01`至`2013-09-01`|
+|AverageTemperature|`double`|平均温度|
+|AverageTemperatureUncertainty |`double`|平均温度区间|
+|Country|`character`|国家名称|
+
+- `GlobalLandTemperaturesByState.csv`
+
+全球按各国一级行政区（省、州、自治区等）分平均每月温度数据。
+
+|字段名|数据类型|简介|
+|:-----|:------:|:---|
+|dt|`date`|按月间隔，自`1855-05-01`至`2013-09-01`|
+|AverageTemperature|`double`|平均温度|
+|AverageTemperatureUncertainty |`double`|平均温度区间|
+|State|`character`|一级行政区名称|
+|Country|`character`|国家名称|
+
+本数据仅包括以下七个国家或地区：澳大利亚、巴西、中国（不含港澳台）、加拿大、印度、俄罗斯、美国。
+
+- `GlobalLandTemperaturesByMajorCity.csv`
+
+全球主要城市平均每月温度数据
+
+|字段名|数据类型|简介|
+|:-----|:------:|:---|
+|dt|`date`|按月间隔，自`1849-01-01`至`2013-09-01`|
+|AverageTemperature|`double`|平均温度|
+|AverageTemperatureUncertainty|`double`|平均温度区间|
+|City|`character`|城市名称|
+|Country|`character`|国家名称|
+|Latitude|`character`|城市经度|
+|Longitude|`character`|城市纬度|
+
+- `GlobalLandTemperaturesByCity.csv`
+
+全球城市平均每月温度数据
+
+|字段名|数据类型|简介|
+|:-----|:------:|:---|
+|dt|`date`|按月间隔，自`1743-11-01`至`2013-09-01`|
+|AverageTemperature|`double`|平均温度|
+|AverageTemperatureUncertainty|`double`|平均温度区间|
+|City|`character`|城市名称|
+|Country|`character`|国家名称|
+|Latitude|`character`|城市经度|
+|Longitude|`character`|城市纬度|
+
+> 该数据表包括前述**主要城市**数据表中的内容且值基本一致。
+
+## 三、全球温度状况分析
+
+```{r global1, fig.width=10}
+global[str_detect(global$dt, "^.....07"),] %>%
+  ggplot(aes(x = dt)) + 
+    geom_ribbon(aes(ymin = LandAverageTemperature-LandAverageTemperatureUncertainty,
+                    ymax = LandAverageTemperature+LandAverageTemperatureUncertainty),
+                color="white", fill="grey") +
+    geom_line(aes(y =  LandAverageTemperature)) +
+    geom_ribbon(aes(ymin = LandAndOceanAverageTemperature-LandAverageTemperatureUncertainty,
+                    ymax = LandAndOceanAverageTemperature+LandAverageTemperatureUncertainty),
+                color="white", fill="grey") +
+    geom_line(aes(y =  LandAndOceanAverageTemperature)) +
+    geom_smooth(aes(y =  LandAverageTemperature), size = 0.8, color = "orange") +
+    geom_smooth(aes(y =  LandAndOceanAverageTemperature), size = 0.8, color = "steelblue") +
+    xlab("Year") +
+    ylab("Temperature") +
+    labs(title = "Global Land Average Temperature in every July")
+```
+
+从上图中可以看出，陆地7月平均气温在1750年-2013年经历了下降-平稳-上升三个阶段。其中750-1875年间呈下降趋势，大约下降了0.7度左右；随后在1875-1950年间气温相对平稳，保持在14摄氏度上方；在1950-2013年间，气温开始快速上升，短短60余年上升了大约1度。
+
+将陆地平均气温与海陆共同的平均气温相比，后者温度普遍高出前者2-3度，二者变化趋势基本一致
+
+## 四、分国家温度状况分析
+
+### 4.1 全球总体情况
+
+在Shiny中选择`Global`以获得某时间段的全球各国的地表气温分布情况（此处不再展示）。从该图中可以看到明显的分布特点：
+
+1. 气温自低纬度向高纬度逐渐降低。
+
+2. 温度的时间分布具有季节性特征，即7月份北暑南寒，1月份北寒南暑。
+
+3. 温度分布符合三圈环流特征。即北半球大陆西岸温度高于大陆东岸。这一特点在北纬30度至90度更为明显。在北半球盛行西风带和极地东风带的影响下，西海岸受到来自低纬度海洋的暖凤影响，温度偏高；而东海岸则受到来自高纬度极地的影响，气温偏低。
+
+4. 全球气温从1750年至2013年经历先降后平稳再升的三个阶段。其中自1950年之后气温增幅较快，60余年时间增长近1摄氏度。
+
+### 4.2 各国情况
+
+本数据包中含有按一级行政区分的地表温度情况，包含在`GlobalLandTemperaturesByState.csv`文件中。其中仅涉及七个国家的一级行政区数据。可在Shiny中选择国家名以查看各国一级行政区的温度分布情况。
+
+将各国气温的统计数据列入下表
+
+|Country|Ave_Temp|Nation_Max|Nation_min|Range|State_Max|State_Min|Range|
+|:-----:|:------:|:--------:|:--------:|:---:|:-------:|:-------:|:---:|
+|Australia|21.62|29.86<br/>(2013-01)|12.53<br/>(1891-07)|9.33|32.214<br/>(2013-01)<br/>(Northern Territory)|2.833<br/>(ACT )<br/>(1929-07)|29.381|
+|Brazil|24.7|27.15<br/>(2009-11)|21.8<br/>(1921-06)|5.35|29.56<br/>(1998-09)<br/>(Tocantins)|10.53<br/>(1953-07)<br/>(Rio Grande do Norte)|19.03|
+|Canada|-5.217|14.796<br/>(2012-07)|-28.736<br/>(1911-01)|43.532|24.489<br/>(1761-07)<br/>(New Brunswick)|-38.806<br/>(1979-02)<br/>(Nunavut)|63.295|
+|China<br/>(expect HK MC TW)|6.613|21.043<br/>(2010-07)|-11.732<br/>(1838-01)|32.775|30.666<br/>(2003-07)<br/>(Jiangxi)|-29.764<br/>(1922-01)<br/>(Heilongjiang)|60.539|
+|India|23.87|31.33<br/>(1921-05)|14.38<br/>(1819-01)|16.95|36.34<br/>(2012-06)<br/>(Delhi)|-11.98<br/>(1905-02)<br/>(Jammu And Kashmir)|48.32|
+|Russia|-5.522|16.893<br/>(2010-07)|-30.577<br/>(1838-01)|47.470|29.501<br/>(2010-07)<br/>(Astrakhan)|-45.389<br/>(1915-01)<br/>(Sakha)|74.890|
+|USA|8.604|23.008<br/>(2012-07)|-7.581<br/>(1886-01)|30.589|32.905<br/>(1906-01)<br/>(Alaska)|-28.788<br/>(1761-07)<br/>(Florida)|51.793|
+
+由上表容易发现，历史高温大多出现在21世纪之后，而历史低温则往往出现在20世纪及以前，这一数据同样能够在一定程度上体现出全球变暖的趋势。
+
+下图展示各国七月及一月的各年气温及拟合线。
+
+```{r country_July, fig.width=10}
+country_temp <- filter(country, Country %in% c("Australia", "Brazil", "China", "Canada", "India", "Russia", "USA"))
+
+ggplot(country_temp[str_detect(country_temp$dt, "^....-07"),], aes(x=dt, y=AverageTemperature, group = Country, color = Country)) +
+  geom_line() +
+  geom_smooth() +
+  xlab("Time") +
+  ylab("Temperaturen") +
+  labs(title="Temperature in July")
+```
+
+```{r country_Jan,  fig.width=10}
+ggplot(country_temp[str_detect(country_temp$dt, "^....-01"),], aes(x=dt, y=AverageTemperature, group = Country, color = Country)) +
+  geom_line() +
+  geom_smooth() +
+  xlab("Time") +
+  ylab("Temperaturen") +
+  labs(title="Temperature in January") 
+```
+
+### 4.3 中国平均温度分析
+
+本文针对中国历史气温变化进行简要分析。您可在Shiny程序中点击**Country**后选择**China**以得到中国各一级行政区（港澳台除外）的地表温度数据。
+
+从地域分布来看，中国横跨纬度较大，故南北气温差距大，1月份省级平均气温极差可达40摄氏度以上，市级更可达到55摄氏度以上。1月时秦岭-淮河一线为平均温度0摄氏度分界线。此外，海拔也是影响温度分布的重要原因。同在北纬30度线上的西藏与四川、湖北等省，在每个月均可观察到西藏省温度偏低，这正是由青藏高原的高海拔所带来的特殊的高原气候。
+
+从时间分布来看，中国大部分属于温带季风气候和温带大陆性气候，大部分地区四季分明，温度也具有明显的随季节变化趋势。
+
+## 五、一级行政区及城市
+
+本部分以可视化为主要任务，请浏览Shiny程序以获得更多内容。
