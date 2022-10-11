@@ -16,3 +16,7 @@
 3. 中国地图数据：[**Horizon**](http://horizon2021.xyz/)
 
 > 本文依赖的[Shiny程序](http://shiny.csu.wiki/EarthTemp/EarthTemp-shiny)使用[**flexdashboard**](https://pkgs.rstudio.com/flexdashboard/)包制作。因数据量大以及服务器运算量限制，每次访问该Shiny程序时需要加载约一分钟时间，请耐心等待。同时因流式页面的特性，每次缩放浏览器窗口都会令Shiny重新运行并绘制图像，故请您务必不要多次改变窗口大小，以免网站崩溃。如遇网站崩溃，还请及时联系站长：*cheny_ycc@qq.com*。
+
+- 本仓库共有两个代码文件：
+  - Dashboard.Rmd：Shiny主程序代码
+  - EarthTemp.Rmd：实验报告
